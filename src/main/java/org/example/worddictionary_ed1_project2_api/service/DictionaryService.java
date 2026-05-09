@@ -168,7 +168,7 @@ public class DictionaryService {
         //Comparator sobre Word directamente
         Comparator<Word> comparator;
         if("frecuencia".equalsIgnoreCase(orderBy)) {
-            comparator = "desc".equalsIgnoreCase(order)
+            comparator = "asc".equalsIgnoreCase(order)
                     ? (a, b) -> b.getFrequency() - a.getFrequency()
                     : (a, b) -> a.getFrequency() - b.getFrequency();
         } else {

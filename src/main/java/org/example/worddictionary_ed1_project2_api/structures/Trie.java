@@ -321,7 +321,7 @@ public class Trie<T> {
         }
     }
 
-    //Recolecta todas las WorEntry que coinciden con el patron
+    //Recolecta todas las WordEntry que coinciden con el patron
     private void collectWithWildcards(Node current, String pattern, int index,
                                       StringBuilder sb, List<WordEntry<T>> result){
         if(index == pattern.length()){

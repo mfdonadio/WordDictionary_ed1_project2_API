@@ -36,19 +36,19 @@ public class DictionaryController {
 
     //----------- DELETE: eliminar palabras --------
     //1. DELETE POR PALABRA
-    @DeleteMapping("/palabra/{palabra}")
-    public ResponseEntity<Void> delete(@PathVariable String palabra){
+    @DeleteMapping("/palabra/eliminar/{palabra}")
+    public ResponseEntity<String> delete(@PathVariable String palabra){
         boolean deleted =  dictionaryService.delete(palabra);
         if(!deleted) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok("Palabra " + palabra + " eliminada exitosamente!" );
     }
 
     //2. DELETE POR ID
-    @DeleteMapping("/palabra/id/{id}")
-    public ResponseEntity<Void> delete(@PathVariable int id){
+    @DeleteMapping("/palabra/eliminar/id/{id}")
+    public ResponseEntity<String> delete(@PathVariable int id){
         boolean deleted =  dictionaryService.deleteById(id);
         if(!deleted) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok("Palabra con ID " + id + " eliminada exitosamente!" );
     }
 
     //-------- GET: busqueda de palabras (exacta) ---------

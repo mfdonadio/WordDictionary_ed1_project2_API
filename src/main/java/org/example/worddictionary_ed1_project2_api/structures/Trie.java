@@ -14,13 +14,29 @@ public class Trie<T> {
     //------------------------------------- INSERT ----------------------------------------------
     //Ahora tambien recibe el significado
     public void insert(String word, T meaning){
+        //"Normalizamos" la palabra
+        String normalized = normalize(word);
+        //Si no logramos normalizarla, ya ni hace falta seguir, retornamos nada mas
+        if(normalized.isEmpty()) return;
+
         Node current = root;
 
-        for(char c : word.toLowerCase().toCharArray()){
-            current.children.putIfAbsent(c, new Node());
-            current = current.children.get(c);
+        //POr cada caracter en la palabra...
+        for (char c : normalized.toCharArray()) {
+            //El siguiente nodo es el hijo --> lo obtenemos
+            Node next = current.children.get(c);
+            //Si es nulo...
+            if (next == null) {
+                //El siguiente es un nuevo nodo
+                next = new Node();
+                //Al que le insertamos el hijo del nodo actual
+                current.children.add(c, next);
+            }
+            //Ahora el actual sera el siguiente para repetir elproceso con todos los hijos
+            current = next;
         }
-        //Si la marcamos por primera vez como 'ultima', aumentamos el coontador de insercion y lo igualamos al timestamp
+
+        //Si la marcamos por primera vez como 'ultima', aumentamos el contador de insercion y lo igualamos al timestamp
         if(!current.isLast){
             current.isLast = true;
             current.timestamp = insertionCounter++;
@@ -31,185 +47,180 @@ public class Trie<T> {
 
     //------------------------------------------ SEARCH --------------------------------------------------
     public boolean search(String word){
-        Node current = root;
-
-        for(char c : word.toLowerCase().toCharArray()){
-            current = current.children.get(c);
-            if(current == null) return false;
-        }
-        return current.isLast;
+        //Buscamos el nodo con getNode y normalizando la palabra para estandarizar
+        Node node = getNode(normalize(word));
+        return node != null && node.isLast;
     }
 
     public WordEntry<T> getEntry(String word){
-        Node current = root;
+        //Estandarizamos la palabra
+        String normalized = normalize(word);
+        //Obtenemos el nodo
+        Node node = getNode(normalized);
 
-        for(char c : word.toLowerCase().toCharArray()){
-            current = current.children.get(c);
-            if(current == null) return null;
-        }
-        if(!current.isLast) return null;
-        return new WordEntry<>(word.toLowerCase(), current.meaning, current.frequency, current.timestamp);
+        //Si es null o no esta marcado como ultimo... retornamos null
+        if (node == null || !node.isLast) return null;
+        //Retornamos la palabra
+        return new WordEntry<>(normalized, node.meaning, node.frequency, node.timestamp);
+
     }
 
     public boolean startsWith(String prefix){
-        Node current = root;
-
-        for(char c : prefix.toLowerCase().toCharArray()){
-            current = current.children.get(c);
-            if(current == null) return false;
-        }
-        return true;
+        //Estandarizamos el prefijo
+        String normalized = normalize(prefix);
+        if (normalized.isEmpty()) return true;
+        return getNode(normalized) != null;
     }
 
     public List<WordEntry<T>> autoComplete(String prefix){
-        Node current = root;
+        //Estandarizamos el prefijo
+        String normalized = normalize(prefix);
+        //Obtenemos el nodo
+        Node current = getNode(normalized);
+        //Si es null, retornamos una nueva lisra VACIA
+        if (current == null) return new ArrayList<>();
 
-        for(char c : prefix.toLowerCase().toCharArray()){
-            current = current.children.get(c);
-            if(current == null) return List.of();
-        }
-
+        //Inicializamos una lista vacia para almacenar las posibles palabras
         List<WordEntry<T>> result = new ArrayList<>();
-        autoComplete(current, result, new StringBuilder(prefix.toLowerCase()));
+        //Recollectamos todas las posibles palabras dado el prefijo
+        collectEntries(current, new StringBuilder(normalized), result);
+        //Retornamos la lisra de posibilidades
         return result;
     }
 
     // Modificamos para que el comparator se inyecte de afuera
     public List<WordEntry<T>> autoComplete(String prefix, int k, Comparator<WordEntry<T>> comparator) {
-        Node current = root;
+       //Normalizamos y obtenemos el nodo
+        String normalized = normalize(prefix);
+        Node current = getNode(normalized);
+        if(current == null || k <= 0) return new ArrayList<>();
 
-        //Vamos al nodo del prefijo
-        for (char c : prefix.toLowerCase().toCharArray()) {
-            current = current.children.get(c);
-            if(current == null) return List.of();
-        }
-
-        //Recolectamos todas las palabras posibles desde este nodo
+        //inicializamos la lista de posibles prefijos
         List<WordEntry<T>> candidates = new ArrayList<>();
-        collectEntries(current, new StringBuilder(prefix.toLowerCase()), candidates);
+        //Recolectamos todas las entradas
+        collectEntries(current, new StringBuilder(normalized), candidates);
         //Ordenamos segun lo solicitado
         candidates.sort(comparator); //Inyeccion del criterio
 
+        //Creamos la lisra en donde enlistaremos los posibles resultados
         List<WordEntry<T>> result = new ArrayList<>();
-        for (int i = 0; i < Math.min(k, candidates.size()); i++) {
+        //Seteamos un limite de iteracion
+        int limit = Math.min(k, candidates.size());
+        for (int i = 0; i < limit; i++) {
+            //Agregamos a los candidatos
             result.add(candidates.get(i));
         }
         return result;
     }
 
     //Adaptado de un video
-    public boolean searchWithWildcards(String word){
-        return searchRecursive(root, word.toLowerCase(), 0); //Indice empieza en 0
+    public boolean searchWithWildcards(String pattern){
+        String normalized = normalize(pattern);
+        if (normalized.isEmpty()) return false;
+        //Buscamos recursivamente en el trie
+        return searchRecursive(root, normalized, 0);
+
     }
 
     //Creo que quedaria bien para el proyecto, ya no solo buscar para un coincidencia sino que tambien para todas
     //Algo mas parecido y adaptado a las herramientas que usamos
     public List<WordEntry<T>> searchAllWithWildcards(String pattern){
+        String normalized = normalize(pattern);
         List<WordEntry<T>> result = new ArrayList<>();
-        collectWithWildcards(root, pattern.toLowerCase(), 0, new StringBuilder(), result);
+
+        if (normalized.isEmpty()) return result;
+
+        collectWithWildcards(root, normalized, 0, new StringBuilder(), result);
         return result;
     }
 
     //--------------------------------------- "UPDATERS" ---------------------------------------------
     public boolean updateMeaning(String word, T newMeaning){
-        Node current = root;
+        //Estandarizamos
+        Node node = getNode(normalize(word));
+        if (node == null || !node.isLast) return false;
 
-        for (char c : word.toLowerCase().toCharArray()) {
-            current = current.children.get(c);
-            if(current == null) return false;
-        }
-        if(!current.isLast) return false;
-        current.meaning = newMeaning;
+        //Actualizamos el significado
+        node.meaning = newMeaning;
         return true;
     }
 
     public boolean updateFrequency(String word, int newFrequency){
-        Node current = root;
+        //Obtenemos el nodo
+        Node node =  getNode(normalize(word));
+        //Verificamos que no sea nulo o no sea el ultimo...
+        if (node == null || !node.isLast) return false;
 
-        for(char c : word.toLowerCase().toCharArray()){
-            current = current.children.get(c);
-            if(current == null) return false;
-        }
-        if(!current.isLast) return false;
-        current.frequency = newFrequency;
+        node.frequency = newFrequency;
         return true;
     }
 
     public boolean renameWord(String oldWord, String newWord){
-        WordEntry<T> entry = getEntry(oldWord);
-        if(entry == null) return false;
+        //Normalizamos el nombre viejo
+        String oldNormalized = normalize(oldWord);
+        //Normalizamos el nombre nuevo
+        String newNormalized = normalize(newWord);
 
-        delete(oldWord);
-        insert(newWord, entry.meaning);
+        //Si el viejo o nuevo estan vacios, retornamos falso... no hay nada que renombrar.
+        if (oldNormalized.isEmpty() || newNormalized.isEmpty()) return false;
+        //Si se da el caso en que el nombre viejo sea igual al nuevo... retornamos true porque es lo mismo
+        if (oldNormalized.equals(newNormalized)) return true;
 
-        Node current = root;
-        for(char c : newWord.toLowerCase().toCharArray()){
-            current = current.children.get(c);
-        }
+        //Ahora, obtenemos la entrada del nombre viejo
+        WordEntry<T> entry = getEntry(oldNormalized);
+        //Si es nula retornamos falso
+        if (entry == null) return false;
+
+        //Primero eliminamos el nombre viejo
+        delete(oldNormalized);
+        //Ahora insertamos el nombre nuevo con la definicion que tenia el nombre viejo y la insertamos en el trie
+        insert(newNormalized, entry.meaning);
+
+        //Obtenemos el nodo actual (el nuevo)
+        Node current = getNode(newNormalized);
+        //Si es nulo retornamos false
+        if (current == null) return false;
+
+        //Seteamos la frecuencia de la nueva nombre con el del nombre viejo
         current.frequency = entry.frequency;
+        //Lo mismo con su timestamp, el nuevo nombre usa el del viejo
+        current.timestamp = entry.timestamp;
+        //Retornamos true.
         return true;
     }
 
     //Delete
     public boolean delete(String word){
-        return deleteRecursive(root, word.toLowerCase(), 0);
+       //Estandarizamos
+        String normalized = normalize(word);
+        if (normalized.isEmpty() || !search(normalized)) return false;
+
+        //Eliminamos recursivamente
+        deleteRecursive(root, normalized, 0);
+        return true;
     }
 
-
-    //----------------------------------------- RECORRIDOS ------------------------------------------
-    public List<String> getWords(){
-        List<String> result = new ArrayList<>();
-        preOrder(this.root, "", result);
-        return result;
-    }
-
-    public List<String> treeTraversal(){
-        List<String> result = new ArrayList<>();
-        postOrder(this.root, "", result);
-        return result;
-    }
-
-    public List<String> nodesByLevel(){
-        List<String> result = new ArrayList<>();
-        if(this.root == null) return result;
-
-        //Hacemos una cola para almacenar los nodos que debemos visitar
-        Queue<NodeWrapper> queue = new LinkedList<>();
-
-        //Primero la raiz
-        queue.add(new NodeWrapper(this.root, ""));
-
-        while(!queue.isEmpty()){
-            //Sacamos el primero nodo
-            NodeWrapper current = queue.poll();
-
-            //Agregamos el nodo a 'result'
-            result.add(current.prefix);
-
-            //Obtenemos las llaves y ordenamos
-            List<Character> letters = new ArrayList<>(current.node.children.keySet());
-            Collections.sort(letters);
-
-            //Agregamos a los hijos a la cola para procesarlos despues
-            for(char letter : letters){
-                queue.add(new NodeWrapper(current.node.children.get(letter), current.prefix + letter));
-            }
-        }
-        return result;
-    }
+    //Borre los recorridos, en este proyecto no me sirven de nada. :D
 
     //------------------------------ COMPARATORS ---------------------------------------
+
+    /*Encontre esta otra manera de definir comparators, se me hizo
+    interesante, asi que la adapte y  la implemente jiji. Todo siempre
+    de STO.
+     */
     public static <T> Comparator<WordEntry<T>> byFrequencyDesc(){
         return (a,b)->{
-            if(b.frequency != a.frequency) return b.frequency - a.frequency;
-            return a.timestamp - b.timestamp; //Si hay empate, el mas antiguo primero :D
+            int byFrquency = Integer.compare(b.frequency, a.frequency);
+                    if(byFrquency != 0) return byFrquency;
+                    return Integer.compare(a.timestamp, b.timestamp);//Si hay empate, el mas antiguo primero :D
         };
     }
 
     public static <T> Comparator<WordEntry<T>> byFrequencyAsc() {
         return (a, b) -> {
-            if (a.frequency != b.frequency) return a.frequency - b.frequency;
-            return b.timestamp - a.timestamp;
+            int byFrquency = Integer.compare(a.frequency, b.frequency);
+            if(byFrquency != 0) return byFrquency;
+            return Integer.compare(a.timestamp, b.timestamp);
         };
     }
 
@@ -223,146 +234,130 @@ public class Trie<T> {
 
 
     //---------------------------------- PRIVATE METHODS ---------------------------------------
-
-    private void preOrder(Node root, String prefix,List<String> result){
-        if(root == null) return;
-
-        //Si el nodo 'raiz' es el fin de una palabra, lo guardamos
-        if(root.isLast){
-            result.add(prefix);
-        }
-
-        //Creamos la lista de caracteres --- obtenemos las llaves
-        List<Character> letters = new ArrayList<>(root.children.keySet());
-        Collections.sort(letters);
-
-        //Exploramos los hijos
-        for(char letter : letters){
-            preOrder(root.children.get(letter), prefix + letter, result);
-        }
+    //Esta funcion me ayuda a estandarizar (o normalizar) el texto que ingrese, acortando espacios y poniendo los caracteres en minusculas
+    private String normalize(String text){
+        if(text == null) return "";
+        return text.trim().toLowerCase();
     }
 
-    private void postOrder(Node root, String prefix, List<String> result){
-        if(root == null) return;
+    //Esta funcion me va a ayudar a obtener los nodos (caracteres) de una palabra
+    private Node getNode(String text){
+        if(text == null) return null;
 
-        //Primero visitamos los hijos
-        //Creamos la lista de caracteres --- obtenemos las llaves
-        List<Character> letters = new ArrayList<>(root.children.keySet());
-        Collections.sort(letters);
-
-        //Exploramos los hijos
-        for(char letter : letters){
-            postOrder(root.children.get(letter), prefix + letter, result);
+        Node current = root;
+        for(char c : text.toLowerCase().toCharArray()){
+            current = current.children.get(c);
+            if(current == null) return null;
         }
-
-        //De ultimo procesamos la raiz
-        result.add(prefix);
+        return current;
     }
 
-    private void autoComplete(Node root, List<WordEntry<T>> result, StringBuilder sb){
-        if(root.isLast){
-            result.add(new WordEntry<>(sb.toString(), root.meaning, root.frequency, root.timestamp));
+    //Devuelve una lista ordenada de los caracteres de un palabra.
+    private List<Character> sortedLetters(Node node){
+        List<Character> letters = new ArrayList<>();
+        for(MyHashMap.WordEntry<Character, Node> entry : node.children.getAll()){
+            letters.add(entry.key);
         }
-        //Creamos la lista de caracteres --- obtenemos las llaves
-        List<Character> letters = new ArrayList<>(root.children.keySet());
         Collections.sort(letters);
-
-        //Exploramos los hijos
-        for(char letter : letters){
-            sb.append(letter);
-            autoComplete(root.children.get(letter), result, sb);
-            sb.setLength(sb.length() - 1);
-        }
+        return letters;
     }
+
 
     //Para recolectar las estadisticas de los nodos ---> igual adaptado de StackOverflow
-    private void collectEntries(Node node, StringBuilder sb, List<WordEntry<T>> candidates){
+    private void collectEntries(Node node, StringBuilder prefix, List<WordEntry<T>> result){
         if(node.isLast){
-            candidates.add(new WordEntry<>(sb.toString(), node.meaning, node.frequency,  node.timestamp));
+            result.add(new WordEntry<>(prefix.toString(), node.meaning, node.frequency,  node.timestamp));
         }
 
-        //Creamos la lista de caracteres --- obtenemos las llaves
-        List<Character> letters = new ArrayList<>(node.children.keySet());
-        Collections.sort(letters); //Ordena el map
-
-        for (char letter : letters) {
-            sb.append(letter);
-            collectEntries(node.children.get(letter), sb, candidates);
-            sb.setLength(sb.length() - 1);
+        for (char letter : sortedLetters(node)) {
+            prefix.append(letter);
+            collectEntries(node.children.get(letter), prefix, result);
+            prefix.setLength(prefix.length() - 1);
         }
     }
 
     //Apatado de un video
-    private boolean searchRecursive(Node current, String word, int index){
-        //Si llegamos al final de la palapra, verificamos si es valida
-        if(index == word.length()) return current.isLast;
+    private boolean searchRecursive(Node current, String pattern, int index){
+        //Si llegamos al final de la palabra, verificamos si es valida
+        if(current == null) return false;
+        if(index == pattern.length()) return current.isLast;
 
-        char c = word.charAt(index);
+        //Obtiene el char en el indice especificado en el patron
+        char c = pattern.charAt(index);
 
-        if(c == '.'){
+        if(c == '.') {
             //Si es un comodin de 1 char, intentamos con todos los hijos posibles --> 26 letras (a-z)
-            for(Node child : current.children.values()){
-                if(searchRecursive(child, word, index+1))
+            for (char letter : sortedLetters(current)) {
+                if (searchRecursive(current.children.get(letter), pattern, index + 1)) {
                     return true; //Si alguna rama encuentra a la palabra, retornamos true
-            }
-            return false; //Si es que ninguna rama coincide
-        } else if(c == '*'){
-            if(searchRecursive(current, word, index+1)) return true;
-            for(Node child : current.children.values()){
-                if(searchRecursive(child, word, index)) return true;
-            }
-            return false;
-        }else {
-            Node nextNode = current.children.get(c); //buscamos el caracter especifico en el HashMap
-            if(nextNode == null){
+                }
                 return false;
             }
-            return searchRecursive(nextNode, word, index + 1);
         }
+        if(c == '*'){
+            //Si es un asterisco, puede reemplazar 0 o mas caracteres, no esta limitado como el punto
+            if(searchRecursive(current, pattern, index+1)) return true;
+            for(char letter : sortedLetters(current)) {
+                if(searchRecursive(current.children.get(letter), pattern, index)) return true; //Si encontramos coincidencias
+            }
+            return false; //Si no encontramos coincidencias
+        }
+            return searchRecursive(current.children.get(c), pattern, index + 1);
     }
 
     //Recolecta todas las WordEntry que coinciden con el patron
     private void collectWithWildcards(Node current, String pattern, int index,
-                                      StringBuilder sb, List<WordEntry<T>> result){
+                                      StringBuilder prefix, List<WordEntry<T>> result){
         if(index == pattern.length()){
             if(current.isLast){
-                result.add(new WordEntry<>(sb.toString(), current.meaning, current.frequency, current.timestamp));
+                addIfAbsent(result, new WordEntry<>(prefix.toString(),
+                        current.meaning, current.frequency, current.timestamp));
             }
             return;
         }
 
+        //Busca el char en el indice indicado dentro del pattern
         char c = pattern.charAt(index);
 
-        if(c == '.'){
-            List<Character> letters = new ArrayList<>(current.children.keySet());
-            Collections.sort(letters);
-            for(char letter : letters){
-                sb.append(letter);
-                collectWithWildcards(current.children.get(letter), pattern, index + 1, sb, result);
-                sb.setLength(sb.length() - 1);
+        if (c == '.') {
+            for (char letter : sortedLetters(current)) {
+                prefix.append(letter);
+                collectWithWildcards(current.children.get(letter), pattern, index + 1, prefix, result);
+                prefix.setLength(prefix.length() - 1);
             }
+            return;
+        }
 
-        } else if(c == '*'){
-            // Cero chars: saltamos el '*'
-            collectWithWildcards(current, pattern, index + 1, sb, result);
-            // Uno o más chars: consumimos un hijo y mantenemos el indice del patron
-            List<Character> letters = new ArrayList<>(current.children.keySet());
-            Collections.sort(letters);
-            for(char letter : letters){
-                sb.append(letter);
-                collectWithWildcards(current.children.get(letter), pattern, index, sb, result);
-                sb.setLength(sb.length() - 1);
-            }
+        if (c == '*') {
+            // Caso 1: '*' consume cero caracteres.
+            collectWithWildcards(current, pattern, index + 1, prefix, result);
 
-        } else {
-            Node next = current.children.get(c);
-            if(next != null){
-                sb.append(c);
-                collectWithWildcards(next, pattern, index + 1, sb, result);
-                sb.setLength(sb.length() - 1);
+            // Caso 2: '*' consume uno o más caracteres.
+            for (char letter : sortedLetters(current)) {
+                prefix.append(letter);
+                collectWithWildcards(current.children.get(letter), pattern, index, prefix, result);
+                prefix.setLength(prefix.length() - 1);
             }
+            return;
+        }
+
+        Node next = current.children.get(c);
+        if (next != null) {
+            prefix.append(c);
+            collectWithWildcards(next, pattern, index + 1, prefix, result);
+            prefix.setLength(prefix.length() - 1);
         }
     }
+
+    // Agrega el candidato a la lista solo si su palabra aún no existe en los resultados.
+    // Esto evita duplicados, especialmente en búsquedas con comodines como '*'.
+    private void addIfAbsent(List<WordEntry<T>> result, WordEntry<T> candidate) {
+        for (WordEntry<T> entry : result) {
+            if (entry.word.equals(candidate.word)) return;
+        }
+        result.add(candidate);
+    }
+
 
 
     //Delete recursivo se encarga de limpiar los nodos huerfanos hacia arriba
@@ -397,14 +392,14 @@ public class Trie<T> {
     //----------------------------------- INTERN CLASSES ------------------------------------
     private class Node{
         //Para mejorar la eficiencia, mejor que un arreglo, es un HashMap
-        public Map<Character, Node> children;
-        public boolean isLast;
-        public int frequency;
-        public int timestamp;//El cirterio de desmpate en caso de que la frecuencia sea la misma
-        public T meaning;
+        private final MyHashMap<Character, Node> children;
+        private boolean isLast;
+        private int frequency;
+        private int timestamp;//El cirterio de desmpate en caso de que la frecuencia sea la misma
+        private T meaning;
 
         public Node(){
-            children = new HashMap<>();
+            children = new MyHashMap<>();
             isLast = false;
             frequency = 0;
             timestamp = Integer.MAX_VALUE;
@@ -414,8 +409,8 @@ public class Trie<T> {
 
     //Este 'wrapper' nos ayuda a manetener el nodo junto con su palabra acumulada ---> lo vi en un video jeje
     private class NodeWrapper {
-        Node node;
-        String prefix;
+        private final Node node;
+        private final String prefix;
 
         //Constructor
         NodeWrapper(Node node, String prefix) {

@@ -4,23 +4,17 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-//CLASE RECICLADA DEL PROYECTO 01 (con cambios minimos --> agregue top K)
-
-
+//CLASE RECICLADA DEL PROYECTO 01 --> con cambios claro
 public class MyPriorityQueue<T> {
     //Creamos la lista y el comparador
     private final ArrayList<T> heap;
     private Comparator<T> comparador;
 
-    //Ahora bien, necesitamos variables para el analisis, osea metricas
-    private long intercambiosTotales;
-    private long intercambiosUltimaOperacion; //Para avaluar una operacin en especifica
-    private long insercionesContadas;
-    private long extraccionesContadas;
 
     //Constructores
     //En caso no sepamos la cantidad de elementos a ingresar, es dinamico
-    public MyPriorityQueue(Comparator<T> comparador){
+    public MyPriorityQueue(Comparator<T> comparador) {
+        validarComparador(comparador);
         this.heap = new ArrayList<>();
         this.comparador = comparador;
     }
@@ -31,45 +25,46 @@ public class MyPriorityQueue<T> {
         this.comparador = comparador;
     }
 
-    //=================================== INSERCIÓN ===============================
+    //Ahora, cuando hagamos el rehash y tengamos que reconstruir (por ejemplo)
+    private MyPriorityQueue(Comparator<T> comparador, List<T> datosIniciales) {
+        validarComparador(comparador);
+        this.heap = new ArrayList<>(datosIniciales);
+        this.comparador = comparador;
+        reconstruirHeap();
+    }
+
+    //--------------------- INSERCIÓN --------------------------
     public void insertar(T valor) {
-        intercambiosUltimaOperacion = 0; //Inicializamos el contador
         heap.add(valor); //Agregamos el valor al arreglo, en la última posición
-        insercionesContadas++; //Aumentamos el contador de inserciones
         subirHeap(heap.size() - 1); //Acomodamos el valor apropiadamente, mandamos el indice del ultimo elemento
     }
 
     //subirHeap: como su nombre lo indica, sube el elemento recién insertado hasta su posicion correcta
-    private void subirHeap(int indice){
+    private int subirHeap(int indice){
         while(indice > 0){ //Iteramos hasta 0 porque el elemento intentara subir hasta esta posicion (la mas alta en prioridad)
             int padre = (indice - 1)/2; //Relación matemática para encontrar el padre, vista en la clase : ((i - 1)/2)
             //Si el hijo tiene mayor prioridad que el padre, intercambiamos
             if(comparador.compare(heap.get(indice),  heap.get(padre)) > 0){ //Si el resultado de compararlos es > 0, significa  que el hijo tiene mayor prioridad
                 //Entonces se realiza el intercambio
-                T tmp = heap.get(indice); //Se crea una variable temporal con el indice del elemento
-                heap.set(indice, heap.get(padre)); //Mueve el valor de padre a la posicion 'indice'
-                heap.set(padre, tmp); //Mueve el valor de 'tmp', osea el valor del indice, a la posicion del padre
-                intercambiosUltimaOperacion++;
-                intercambiosTotales++;
+                intercambiar(indice, padre);
                 indice = padre;
             } else {
                 break;
             }
         }
+        return indice;
     }
 
-    //=================================== EXTRACCIÓN ===============================
+    //------------------- EXTRACCIÓN -------------------------
     //Su objetivo es extraer y devolver el elemento de mayor prioridad
     public T extraer() {
         if(heap.isEmpty()) return null;
-
-        intercambiosUltimaOperacion = 0; //Volvemos a inicilizar el contador
-        extraccionesContadas++; //Aumentamos el contador de extracciones
 
         T raiz = heap.get(0); //La raiz es el primer elemento de la lista
 
         //Como lo vimos en clase, movemos el ultimo elemento a la posicion de la raiz, eliminamos la raiz y luego bajamos el elemento
         T ultimo = heap.remove(heap.size() - 1); //Guardamos el ultimo valor en una variable temporal, y ;a removemos de la lista
+
         if(!heap.isEmpty()){ //Si el heap NO eta vacio
             heap.set(0, ultimo); //Movemos el ultiimo valor a la primera posicion
             bajarHeap(0); //Bajamos el ultimo elemento a su nueva posicion
@@ -108,18 +103,18 @@ public class MyPriorityQueue<T> {
             de posicion de la variable 'mayorPrioridad', hacemos un intercambio y seteamos (hundimos)
             el valor del indice con el de 'mayorPrioridad'
              */
-            if(mayorPrioridad != indice){
-                //Entonces se realiza el intercambio
-                T tmp = heap.get(indice); //Se crea una variable temporal con el indice del elemento
-                heap.set(indice, heap.get(mayorPrioridad)); //Mueve el valor de mayorPrioridad a la posicion 'indice'
-                heap.set(mayorPrioridad, tmp); //Mueve el valor de 'tmp', osea el valor del indice, a la posicion de mayorPrioridad
-                intercambiosUltimaOperacion++;
-                intercambiosTotales++;
-                indice = mayorPrioridad;
-            } else{
-                break;
-            }
+            if(mayorPrioridad == indice) break;
+             //Intercambiamos
+            intercambiar(indice, mayorPrioridad);
+            indice = mayorPrioridad;
         }
+    }
+
+    //Uso el intercambio mas de una vez, asi que ahora le hare su propia funcion para recilcar codigo
+    private void intercambiar(int i, int j){
+        T tmp = heap.get(i);
+        heap.set(i, heap.get(j));
+        heap.set(j, tmp);
     }
 
     //=================================== PEEK ===============================
@@ -133,7 +128,7 @@ public class MyPriorityQueue<T> {
 
     /*
     Mejoramos este metodo, porque no habiamos considerado de que el dato 'nuevo' y 'viejo' podrian ser el mismo... solo
-    lo hicimos por nbuena practica
+    lo hicimos por buena practica
      */
     public void modificarPrioridad(T elemento){
         int indice = buscarIndice(elemento); //Buscamos el indice del valor viejo
@@ -141,8 +136,8 @@ public class MyPriorityQueue<T> {
 
         //Ahora, deberiamos de intentar subir primero el valor, en caso de que la prioridad lo permita
         //De lo contrario, lo bajamos
-        subirHeap(indice);
-        bajarHeap(indice);
+        int nievoIndice = subirHeap(indice);
+        bajarHeap(nievoIndice);
     }
 
     private int buscarIndice(T valor){
@@ -152,27 +147,31 @@ public class MyPriorityQueue<T> {
         return -1; //Sino, el valor no existe
     }
 
-    //=============================== OBTENER TOP K ===============================================
+    //----------------- OBTENER TOP K -----------------------------
     // Retorna los K elementos de mayor prioridad SIN destruir el heap original
     public List<T> topK(int k) {
+        //Iniciamos una lisra en la cual colocar el resultado
+        List<T> resultado = new ArrayList<>();
+        //En caso de que K <= 0 o que la cola este vacia... retornamos el resultaado vacio.
+        if(k <= 0 || heap.isEmpty()) return resultado;
+
         // Hacemos una copia para no destruir el heap original
         MyPriorityQueue<T> copia = new MyPriorityQueue<>(this.comparador);
         for(T elemento : this.heap){
             copia.insertar(elemento);
         }
 
-        List<T> resultado = new ArrayList<>();
+
         for(int i = 0; i < k && !copia.estaVacia(); i++){
             resultado.add(copia.extraer());
         }
         return resultado;
     }
 
-    //=================================== LO BUENARDO: CAMBIAR ENTRE MAX Y MIN HEAP ===============================
-    //El programa tiene que poder alternar entre Max y Min heap cuando sea.
 
-    //Primero, hay que crear otro comparador
+    //--------------------- COMPARATOR --------------------------
     public void setComparator(Comparator<T> nuevoComparador){
+        validarComparador(nuevoComparador);
         this.comparador = nuevoComparador;
         reconstruirHeap(); //Aqui mandamos a reconstruir el heap
     }
@@ -192,45 +191,31 @@ public class MyPriorityQueue<T> {
         }
     }
 
-    //=================================== ESTADOS E INFO ADICIONAL ===============================
-    public boolean estaVacia()  { return heap.isEmpty(); }
-    public int     tamanio()    { return heap.size(); }
+    //Esta validacion se me hace una buena practica, lo vi en una implementacion y creo que no esta de mas
+    private void validarComparador(Comparator<T> comparador){
+        if(comparador == null) {
+            throw new IllegalArgumentException("El comparador no puede ser null.");
+        }
+    }
+
+    //----------------------- ESTADOS --------------------------
+    public boolean estaVacia() {
+        return heap.isEmpty();
+    }
+    public int tamanio() {
+        return heap.size();
+    }
 
     //Devuelve una copia de los elementos en orden del array interno.
-    public List<T> obtenerTodos() { return new ArrayList<>(heap); }
+    public List<T> obtenerTodos() {
+        return new ArrayList<>(heap);
+    }
 
     public void limpiar() {
         heap.clear();
-        resetearMetricas();
     }
 
-    //================================== COSAS IMPORTANTES PARA LAS METRICAS ======================
-    public long getIntercambiosTotales()  { return intercambiosTotales; }
-    public long getIntercambiosUltimaOp() { return intercambiosUltimaOperacion; }
-    public long getInsercionesCont()      { return insercionesContadas; }
-    public long getExtraccionesCont()     { return extraccionesContadas; }
-
-    public void resetearMetricas() {
-        intercambiosTotales  = 0;
-        intercambiosUltimaOperacion = 0;
-        insercionesContadas     = 0;
-        extraccionesContadas     = 0;
-    }
-
-    public void estadisticas() {
-        System.out.println("=".repeat(45));
-        System.out.println("  Estadisticas Cola de Prioridad");
-        System.out.println("=".repeat(45));
-        System.out.printf("  Elementos actuales  : %d%n",   tamanio());
-        System.out.printf("  Inserciones         : %,d%n",  insercionesContadas);
-        System.out.printf("  Extracciones        : %,d%n",  extraccionesContadas);
-        System.out.printf("  Intercambios totales    : %,d%n",  intercambiosTotales);
-        System.out.printf("  Proximo a salir     : %s%n",
-                heap.isEmpty() ? "vacia" : heap.get(0).toString());
-        System.out.println("=".repeat(45));
-    }
-
-    //Getter del comparador ---> implementacion necesaria dadas las pruebas
+    //--------------------- GETTER del COMPARADOR --------------------
     public Comparator<T> getComparator() { return this.comparador; }
 
 }

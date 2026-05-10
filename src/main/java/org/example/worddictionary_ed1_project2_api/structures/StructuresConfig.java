@@ -1,10 +1,6 @@
 package org.example.worddictionary_ed1_project2_api.structures;
 
 import org.example.worddictionary_ed1_project2_api.model.Word;
-import org.example.worddictionary_ed1_project2_api.structures.MyHashMap;
-import org.example.worddictionary_ed1_project2_api.structures.MyPriorityQueue;
-import org.example.worddictionary_ed1_project2_api.structures.Trie;
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -27,6 +23,6 @@ public class StructuresConfig {
     @Bean
     public MyPriorityQueue<Word> priorityQueue() {
         // Comparador por defecto: mayor frecuencia primero
-        return new MyPriorityQueue<>((a, b) -> b.getFrequency() - a.getFrequency());
+        return new MyPriorityQueue<>((a, b) -> Integer.compare(a.getFrequency(), b.getFrequency()));
     }
 }

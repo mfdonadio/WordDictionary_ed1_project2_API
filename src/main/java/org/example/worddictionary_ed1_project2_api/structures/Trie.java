@@ -285,14 +285,15 @@ public class Trie<T> {
         //Obtiene el char en el indice especificado en el patron
         char c = pattern.charAt(index);
 
+
+        //Si es un comodin de 1 char, intentamos con todos los hijos posibles --> 26 letras (a-z)
         if(c == '.') {
-            //Si es un comodin de 1 char, intentamos con todos los hijos posibles --> 26 letras (a-z)
             for (char letter : sortedLetters(current)) {
                 if (searchRecursive(current.children.get(letter), pattern, index + 1)) {
-                    return true; //Si alguna rama encuentra a la palabra, retornamos true
+                    return true;
                 }
-                return false;
             }
+            return false;
         }
         if(c == '*'){
             //Si es un asterisco, puede reemplazar 0 o mas caracteres, no esta limitado como el punto

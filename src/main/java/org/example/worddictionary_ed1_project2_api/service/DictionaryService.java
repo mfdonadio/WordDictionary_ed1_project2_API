@@ -32,7 +32,13 @@ public class DictionaryService {
     public void loadFromCSV(){
         List<Word> words = csvUtil.importCSV();
         for(Word w : words){
-            trie.insert(w.getWord(), w.getDefinition());
+            String key = w.getWord().trim().toLowerCase();
+
+            if(key.isEmpty()) continue;
+
+            w.setWord(key);
+
+            trie.insert(key, w.getDefinition());
             hashMap.addWithId(w.getWord(), w, w.getId()); //Preservamos el Id
         }
         System.out.println("Diccionario cargado con " + words.size() + " palabras.");
@@ -40,13 +46,18 @@ public class DictionaryService {
 
     //--------- INSERCION ---------- (lo mismo que hice en MyPriorityQueue pero para el service)
     public WordResponse insert(WordRequest request) {
-        String w = request.getWord().toLowerCase();
+       validateInsertRequest(request);
+
+
+        String w = request.getWord().trim().toLowerCase();
+        String definition = request.getDefinition() == null ? "" : request.getDefinition();
 
         // Si ya existe, solo aumentamos la frecuencia
         if (hashMap.contains(w)) {
             Word existente = hashMap.get(w);
             existente.setFrequency(existente.getFrequency() + 1);
-            trie.updateFrequency(w, existente.getFrequency());
+            existente.setDefinition(definition);
+
             saveCSV();
             return toResponse(existente);
         }
@@ -58,6 +69,7 @@ public class DictionaryService {
         // Obtenemos el ID que le asigno el HashMap
         MyHashMap.WordEntry<String, Word> entryCreated = hashMap.getEntry(w);
         n.setId(entryCreated.id);
+
         trie.insert(w, request.getDefinition()); // solo una vez, después del hashMap
         saveCSV();
         return toResponse(n);
@@ -65,6 +77,10 @@ public class DictionaryService {
 
     //--------- UPDATE -----------------
     public WordResponse update(int id, WordRequest request) {
+        if(request == null){
+            throw new IllegalArgumentException("La solicitud no puede estar vacía.");
+        }
+
         MyHashMap.WordEntry<String, Word> entry = hashMap.getEntryById(id);
         if (entry == null) return null;
 
@@ -77,7 +93,7 @@ public class DictionaryService {
             trie.renameWord(oldWord, newWord);
             hashMap.remove(oldWord);
             current.setWord(newWord);
-            hashMap.add(newWord, current);
+            hashMap.addWithId(newWord, current, id);
         }
 
         // Actualizamos significado y frecuencia
@@ -93,10 +109,13 @@ public class DictionaryService {
     //----------- DELETE -------------
     public boolean delete(String word) {
         word = word.toLowerCase();
+
+        if(word.isEmpty()) return false;
         if (!hashMap.contains(word)) return false;
 
         trie.delete(word);
         hashMap.remove(word);
+
         saveCSV();
         return true;
     }
@@ -114,12 +133,13 @@ public class DictionaryService {
     //---------- SEARCH --------------
     // Busqueda exacta por palabra
     public WordResponse search(String palabra) {
-        Word p = hashMap.get(palabra.toLowerCase());
+        Word p = hashMap.get(palabra.trim().toLowerCase());
         if (p == null) return null;
 
         // Cada busqueda aumenta la frecuencia
         p.setFrequency(p.getFrequency() + 1);
         trie.updateFrequency(palabra.toLowerCase(), p.getFrequency());
+
         saveCSV();
         return toResponse(p);
     }
@@ -173,8 +193,8 @@ public class DictionaryService {
                     : (a, b) -> a.getFrequency() - b.getFrequency();
         } else {
             comparator = "desc".equalsIgnoreCase(order)
-                    ? (a, b) -> b.getWord().compareTo(a.getWord())
-                    :  (a, b) -> a.getWord().compareTo(b.getWord());
+                    ? (a, b) -> a.getWord().compareTo(b.getWord())
+                    :  (a, b) -> b.getWord().compareTo(a.getWord());
         }
 
         MyPriorityQueue<Word> queue = new MyPriorityQueue<>(comparator);
@@ -209,6 +229,17 @@ public class DictionaryService {
 
     private WordResponse toResponse(Word p) {
         return new WordResponse(p.getId(), p.getWord(), p.getDefinition(), p.getFrequency());
+    }
+
+    //Valida que la solicitud de inserción tenga una palabra válida
+    private void validateInsertRequest(WordRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("La solicitud no puede estar vacía.");
+        }
+
+        if (request.getWord() == null || request.getWord().trim().isEmpty()) {
+            throw new IllegalArgumentException("Debe ingresar una palabra válida.");
+        }
     }
 
     // Resuelve el comparator segun los parametros de la request

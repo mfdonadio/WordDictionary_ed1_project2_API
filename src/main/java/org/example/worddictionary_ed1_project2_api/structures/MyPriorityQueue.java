@@ -156,11 +156,7 @@ public class MyPriorityQueue<T> {
         if(k <= 0 || heap.isEmpty()) return resultado;
 
         // Hacemos una copia para no destruir el heap original
-        MyPriorityQueue<T> copia = new MyPriorityQueue<>(this.comparador);
-        for(T elemento : this.heap){
-            copia.insertar(elemento);
-        }
-
+        MyPriorityQueue<T> copia = new MyPriorityQueue<>(this.comparador, this.heap);
 
         for(int i = 0; i < k && !copia.estaVacia(); i++){
             resultado.add(copia.extraer());

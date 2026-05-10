@@ -12,7 +12,7 @@ public class WordRequest {
     private Integer id;
     private String word;
     private String definition;
-    private int frequency;
+    private Integer frequency;
 
     public WordRequest(){}
 

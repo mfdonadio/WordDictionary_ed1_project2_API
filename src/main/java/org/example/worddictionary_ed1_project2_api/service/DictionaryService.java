@@ -58,19 +58,22 @@ public class DictionaryService {
             existente.setFrequency(existente.getFrequency() + 1);
             existente.setDefinition(definition);
 
+            trie.updateFrequency(existente.getWord(), existente.getFrequency());
+            trie.updateMeaning(existente.getWord(), existente.getDefinition());
+
             saveCSV();
             return toResponse(existente);
         }
 
         // Si no existe, insertamos
-        Word n = new Word(0, w, request.getDefinition(), 1);
+        Word n = new Word(0, w, definition, 1);
         hashMap.add(w, n);
 
         // Obtenemos el ID que le asigno el HashMap
         MyHashMap.WordEntry<String, Word> entryCreated = hashMap.getEntry(w);
         n.setId(entryCreated.id);
 
-        trie.insert(w, request.getDefinition()); // solo una vez, después del hashMap
+        trie.insert(w, definition); // solo una vez, después del hashMap
         saveCSV();
         return toResponse(n);
     }
